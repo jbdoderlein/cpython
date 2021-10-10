@@ -373,6 +373,9 @@ def find_binding(name, node, package=None):
         elif child.type in (syms.if_stmt, syms.while_stmt):
             n = find_binding(name, make_suite(child.children[-1]), package)
             if n: ret = n
+        elif child.type in (syms.if_stmt, syms.ifloop_stmt):
+            n = find_binding(name, make_suite(child.children[-1]), package)
+            if n: ret = n
         elif child.type == syms.try_stmt:
             n = find_binding(name, make_suite(child.children[2]), package)
             if n:

@@ -1313,6 +1313,12 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         if (s->v.While.orelse)
             VISIT_SEQ(st, stmt, s->v.While.orelse);
         break;
+    case IfLoop_kind:
+        VISIT(st, expr, s->v.IfLoop.test);
+        VISIT_SEQ(st, stmt, s->v.IfLoop.body);
+        if (s->v.IfLoop.orelse)
+            VISIT_SEQ(st, stmt, s->v.IfLoop.orelse);
+        break;
     case If_kind:
         /* XXX if 0: and lookup_yield() hacks */
         VISIT(st, expr, s->v.If.test);

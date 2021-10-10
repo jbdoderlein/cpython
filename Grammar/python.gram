@@ -133,6 +133,7 @@ compound_stmt[stmt_ty]:
     | &('for' | ASYNC) for_stmt
     | &'try' try_stmt
     | &'while' while_stmt
+    | &'ifloop' ifloop_stmt
     | match_stmt
 
 # SIMPLE STATEMENTS
@@ -364,6 +365,13 @@ else_block[asdl_stmt_seq*]:
 while_stmt[stmt_ty]:
     | invalid_while_stmt
     | 'while' a=named_expression ':' b=block c=[else_block] { _PyAST_While(a, b, c, EXTRA) }
+
+# Ifloop statement
+# ---------------
+
+ifloop_stmt[stmt_ty]:
+    | invalid_ifloop_stmt
+    | 'ifloop' a=named_expression ':' b=block c=[else_block] { _PyAST_IfLoop(a, b, c, EXTRA) }
 
 # For statement
 # -------------
@@ -1230,6 +1238,10 @@ invalid_while_stmt:
     | 'while' named_expression NEWLINE { RAISE_SYNTAX_ERROR("expected ':'") }
     | a='while' named_expression ':' NEWLINE !INDENT {
         RAISE_INDENTATION_ERROR("expected an indented block after 'while' statement on line %d", a->lineno) }
+invalid_ifloop_stmt:
+    | 'ifloop' named_expression NEWLINE { RAISE_SYNTAX_ERROR("expected ':'") }
+    | a='ifloop' named_expression ':' NEWLINE !INDENT {
+        RAISE_INDENTATION_ERROR("expected an indented block after 'ifloop' statement on line %d", a->lineno) }
 invalid_for_stmt:
     | [ASYNC] a='for' star_targets 'in' star_expressions ':' NEWLINE !INDENT {
         RAISE_INDENTATION_ERROR("expected an indented block after 'for' statement on line %d", a->lineno) }

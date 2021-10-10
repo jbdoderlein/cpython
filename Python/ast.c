@@ -738,6 +738,11 @@ validate_stmt(struct validator *state, stmt_ty stmt)
             validate_body(state, stmt->v.While.body, "While") &&
             validate_stmts(state, stmt->v.While.orelse);
         break;
+    case IfLoop_kind:
+        ret = validate_expr(state, stmt->v.IfLoop.test, Load) &&
+            validate_body(state, stmt->v.IfLoop.body, "IfLoop") &&
+            validate_stmts(state, stmt->v.IfLoop.orelse);
+        break;
     case If_kind:
         ret = validate_expr(state, stmt->v.If.test, Load) &&
             validate_body(state, stmt->v.If.body, "If") &&

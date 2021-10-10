@@ -1759,6 +1759,10 @@ find_ann(asdl_stmt_seq *stmts)
             res = find_ann(st->v.While.body) ||
                   find_ann(st->v.While.orelse);
             break;
+        case IfLoop_kind:
+            res = find_ann(st->v.IfLoop.body) ||
+                  find_ann(st->v.IfLoop.orelse);
+            break;
         case If_kind:
             res = find_ann(st->v.If.body) ||
                   find_ann(st->v.If.orelse);
@@ -3625,6 +3629,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
     case For_kind:
         return compiler_for(c, s);
     case While_kind:
+        return compiler_while(c, s);
+    case IfLoop_kind:
         return compiler_while(c, s);
     case If_kind:
         return compiler_if(c, s);
