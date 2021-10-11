@@ -453,12 +453,12 @@ static const char * const AsyncFor_fields[]={
     "orelse",
     "type_comment",
 };
-static const char * const IfLoop_fields[]={
+static const char * const While_fields[]={
     "test",
     "body",
     "orelse",
 };
-static const char * const While_fields[]={
+static const char * const IfLoop_fields[]={
     "test",
     "body",
     "orelse",
@@ -1138,8 +1138,8 @@ init_types(struct ast_state *state)
         "     | AnnAssign(expr target, expr annotation, expr? value, int simple)\n"
         "     | For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)\n"
         "     | AsyncFor(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)\n"
-        "     | IfLoop(expr test, stmt* body, stmt* orelse)\n"
         "     | While(expr test, stmt* body, stmt* orelse)\n"
+        "     | IfLoop(expr test, stmt* body, stmt* orelse)\n"
         "     | If(expr test, stmt* body, stmt* orelse)\n"
         "     | With(withitem* items, stmt* body, string? type_comment)\n"
         "     | AsyncWith(withitem* items, stmt* body, string? type_comment)\n"
@@ -1226,14 +1226,14 @@ init_types(struct ast_state *state)
     if (PyObject_SetAttr(state->AsyncFor_type, state->type_comment, Py_None) ==
         -1)
         return 0;
-    state->IfLoop_type = make_type(state, "IfLoop", state->stmt_type,
-                                   IfLoop_fields, 3,
-        "IfLoop(expr test, stmt* body, stmt* orelse)");
-    if (!state->IfLoop_type) return 0;
     state->While_type = make_type(state, "While", state->stmt_type,
                                   While_fields, 3,
         "While(expr test, stmt* body, stmt* orelse)");
     if (!state->While_type) return 0;
+    state->IfLoop_type = make_type(state, "IfLoop", state->stmt_type,
+                                   IfLoop_fields, 3,
+        "IfLoop(expr test, stmt* body, stmt* orelse)");
+    if (!state->IfLoop_type) return 0;
     state->If_type = make_type(state, "If", state->stmt_type, If_fields, 3,
         "If(expr test, stmt* body, stmt* orelse)");
     if (!state->If_type) return 0;
@@ -2239,31 +2239,6 @@ _PyAST_AsyncFor(expr_ty target, expr_ty iter, asdl_stmt_seq * body,
 }
 
 stmt_ty
-_PyAST_IfLoop(expr_ty test, asdl_stmt_seq * body, asdl_stmt_seq * orelse, int
-              lineno, int col_offset, int end_lineno, int end_col_offset,
-              PyArena *arena)
-{
-    stmt_ty p;
-    if (!test) {
-        PyErr_SetString(PyExc_ValueError,
-                        "field 'test' is required for IfLoop");
-        return NULL;
-    }
-    p = (stmt_ty)_PyArena_Malloc(arena, sizeof(*p));
-    if (!p)
-        return NULL;
-    p->kind = IfLoop_kind;
-    p->v.IfLoop.test = test;
-    p->v.IfLoop.body = body;
-    p->v.IfLoop.orelse = orelse;
-    p->lineno = lineno;
-    p->col_offset = col_offset;
-    p->end_lineno = end_lineno;
-    p->end_col_offset = end_col_offset;
-    return p;
-}
-
-stmt_ty
 _PyAST_While(expr_ty test, asdl_stmt_seq * body, asdl_stmt_seq * orelse, int
              lineno, int col_offset, int end_lineno, int end_col_offset,
              PyArena *arena)
@@ -2281,6 +2256,31 @@ _PyAST_While(expr_ty test, asdl_stmt_seq * body, asdl_stmt_seq * orelse, int
     p->v.While.test = test;
     p->v.While.body = body;
     p->v.While.orelse = orelse;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+stmt_ty
+_PyAST_IfLoop(expr_ty test, asdl_stmt_seq * body, asdl_stmt_seq * orelse, int
+              lineno, int col_offset, int end_lineno, int end_col_offset,
+              PyArena *arena)
+{
+    stmt_ty p;
+    if (!test) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'test' is required for IfLoop");
+        return NULL;
+    }
+    p = (stmt_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = IfLoop_kind;
+    p->v.IfLoop.test = test;
+    p->v.IfLoop.body = body;
+    p->v.IfLoop.orelse = orelse;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -3944,6 +3944,26 @@ ast2obj_stmt(struct ast_state *state, void* _o)
             goto failed;
         Py_DECREF(value);
         break;
+    case While_kind:
+        tp = (PyTypeObject *)state->While_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_expr(state, o->v.While.test);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->test, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_list(state, (asdl_seq*)o->v.While.body, ast2obj_stmt);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->body, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_list(state, (asdl_seq*)o->v.While.orelse, ast2obj_stmt);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->orelse, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
     case IfLoop_kind:
         tp = (PyTypeObject *)state->IfLoop_type;
         result = PyType_GenericNew(tp, NULL, NULL);
@@ -3960,26 +3980,6 @@ ast2obj_stmt(struct ast_state *state, void* _o)
         Py_DECREF(value);
         value = ast2obj_list(state, (asdl_seq*)o->v.IfLoop.orelse,
                              ast2obj_stmt);
-        if (!value) goto failed;
-        if (PyObject_SetAttr(result, state->orelse, value) == -1)
-            goto failed;
-        Py_DECREF(value);
-        break;
-    case While_kind:
-        tp = (PyTypeObject *)state->While_type;
-        result = PyType_GenericNew(tp, NULL, NULL);
-        if (!result) goto failed;
-        value = ast2obj_expr(state, o->v.While.test);
-        if (!value) goto failed;
-        if (PyObject_SetAttr(result, state->test, value) == -1)
-            goto failed;
-        Py_DECREF(value);
-        value = ast2obj_list(state, (asdl_seq*)o->v.While.body, ast2obj_stmt);
-        if (!value) goto failed;
-        if (PyObject_SetAttr(result, state->body, value) == -1)
-            goto failed;
-        Py_DECREF(value);
-        value = ast2obj_list(state, (asdl_seq*)o->v.While.orelse, ast2obj_stmt);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->orelse, value) == -1)
             goto failed;
@@ -6830,112 +6830,6 @@ obj2ast_stmt(struct ast_state *state, PyObject* obj, stmt_ty* out, PyArena*
         if (*out == NULL) goto failed;
         return 0;
     }
-    tp = state->IfLoop_type;
-    isinstance = PyObject_IsInstance(obj, tp);
-    if (isinstance == -1) {
-        return 1;
-    }
-    if (isinstance) {
-        expr_ty test;
-        asdl_stmt_seq* body;
-        asdl_stmt_seq* orelse;
-
-        if (_PyObject_LookupAttr(obj, state->test, &tmp) < 0) {
-            return 1;
-        }
-        if (tmp == NULL) {
-            PyErr_SetString(PyExc_TypeError, "required field \"test\" missing from IfLoop");
-            return 1;
-        }
-        else {
-            int res;
-            if (Py_EnterRecursiveCall(" while traversing 'IfLoop' node")) {
-                goto failed;
-            }
-            res = obj2ast_expr(state, tmp, &test, arena);
-            Py_LeaveRecursiveCall();
-            if (res != 0) goto failed;
-            Py_CLEAR(tmp);
-        }
-        if (_PyObject_LookupAttr(obj, state->body, &tmp) < 0) {
-            return 1;
-        }
-        if (tmp == NULL) {
-            PyErr_SetString(PyExc_TypeError, "required field \"body\" missing from IfLoop");
-            return 1;
-        }
-        else {
-            int res;
-            Py_ssize_t len;
-            Py_ssize_t i;
-            if (!PyList_Check(tmp)) {
-                PyErr_Format(PyExc_TypeError, "IfLoop field \"body\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
-                goto failed;
-            }
-            len = PyList_GET_SIZE(tmp);
-            body = _Py_asdl_stmt_seq_new(len, arena);
-            if (body == NULL) goto failed;
-            for (i = 0; i < len; i++) {
-                stmt_ty val;
-                PyObject *tmp2 = PyList_GET_ITEM(tmp, i);
-                Py_INCREF(tmp2);
-                if (Py_EnterRecursiveCall(" while traversing 'IfLoop' node")) {
-                    goto failed;
-                }
-                res = obj2ast_stmt(state, tmp2, &val, arena);
-                Py_LeaveRecursiveCall();
-                Py_DECREF(tmp2);
-                if (res != 0) goto failed;
-                if (len != PyList_GET_SIZE(tmp)) {
-                    PyErr_SetString(PyExc_RuntimeError, "IfLoop field \"body\" changed size during iteration");
-                    goto failed;
-                }
-                asdl_seq_SET(body, i, val);
-            }
-            Py_CLEAR(tmp);
-        }
-        if (_PyObject_LookupAttr(obj, state->orelse, &tmp) < 0) {
-            return 1;
-        }
-        if (tmp == NULL) {
-            PyErr_SetString(PyExc_TypeError, "required field \"orelse\" missing from IfLoop");
-            return 1;
-        }
-        else {
-            int res;
-            Py_ssize_t len;
-            Py_ssize_t i;
-            if (!PyList_Check(tmp)) {
-                PyErr_Format(PyExc_TypeError, "IfLoop field \"orelse\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
-                goto failed;
-            }
-            len = PyList_GET_SIZE(tmp);
-            orelse = _Py_asdl_stmt_seq_new(len, arena);
-            if (orelse == NULL) goto failed;
-            for (i = 0; i < len; i++) {
-                stmt_ty val;
-                PyObject *tmp2 = PyList_GET_ITEM(tmp, i);
-                Py_INCREF(tmp2);
-                if (Py_EnterRecursiveCall(" while traversing 'IfLoop' node")) {
-                    goto failed;
-                }
-                res = obj2ast_stmt(state, tmp2, &val, arena);
-                Py_LeaveRecursiveCall();
-                Py_DECREF(tmp2);
-                if (res != 0) goto failed;
-                if (len != PyList_GET_SIZE(tmp)) {
-                    PyErr_SetString(PyExc_RuntimeError, "IfLoop field \"orelse\" changed size during iteration");
-                    goto failed;
-                }
-                asdl_seq_SET(orelse, i, val);
-            }
-            Py_CLEAR(tmp);
-        }
-        *out = _PyAST_IfLoop(test, body, orelse, lineno, col_offset,
-                             end_lineno, end_col_offset, arena);
-        if (*out == NULL) goto failed;
-        return 0;
-    }
     tp = state->While_type;
     isinstance = PyObject_IsInstance(obj, tp);
     if (isinstance == -1) {
@@ -7039,6 +6933,112 @@ obj2ast_stmt(struct ast_state *state, PyObject* obj, stmt_ty* out, PyArena*
         }
         *out = _PyAST_While(test, body, orelse, lineno, col_offset, end_lineno,
                             end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->IfLoop_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        expr_ty test;
+        asdl_stmt_seq* body;
+        asdl_stmt_seq* orelse;
+
+        if (_PyObject_LookupAttr(obj, state->test, &tmp) < 0) {
+            return 1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"test\" missing from IfLoop");
+            return 1;
+        }
+        else {
+            int res;
+            if (Py_EnterRecursiveCall(" while traversing 'IfLoop' node")) {
+                goto failed;
+            }
+            res = obj2ast_expr(state, tmp, &test, arena);
+            Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        if (_PyObject_LookupAttr(obj, state->body, &tmp) < 0) {
+            return 1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"body\" missing from IfLoop");
+            return 1;
+        }
+        else {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "IfLoop field \"body\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            body = _Py_asdl_stmt_seq_new(len, arena);
+            if (body == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                stmt_ty val;
+                PyObject *tmp2 = PyList_GET_ITEM(tmp, i);
+                Py_INCREF(tmp2);
+                if (Py_EnterRecursiveCall(" while traversing 'IfLoop' node")) {
+                    goto failed;
+                }
+                res = obj2ast_stmt(state, tmp2, &val, arena);
+                Py_LeaveRecursiveCall();
+                Py_DECREF(tmp2);
+                if (res != 0) goto failed;
+                if (len != PyList_GET_SIZE(tmp)) {
+                    PyErr_SetString(PyExc_RuntimeError, "IfLoop field \"body\" changed size during iteration");
+                    goto failed;
+                }
+                asdl_seq_SET(body, i, val);
+            }
+            Py_CLEAR(tmp);
+        }
+        if (_PyObject_LookupAttr(obj, state->orelse, &tmp) < 0) {
+            return 1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"orelse\" missing from IfLoop");
+            return 1;
+        }
+        else {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "IfLoop field \"orelse\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            orelse = _Py_asdl_stmt_seq_new(len, arena);
+            if (orelse == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                stmt_ty val;
+                PyObject *tmp2 = PyList_GET_ITEM(tmp, i);
+                Py_INCREF(tmp2);
+                if (Py_EnterRecursiveCall(" while traversing 'IfLoop' node")) {
+                    goto failed;
+                }
+                res = obj2ast_stmt(state, tmp2, &val, arena);
+                Py_LeaveRecursiveCall();
+                Py_DECREF(tmp2);
+                if (res != 0) goto failed;
+                if (len != PyList_GET_SIZE(tmp)) {
+                    PyErr_SetString(PyExc_RuntimeError, "IfLoop field \"orelse\" changed size during iteration");
+                    goto failed;
+                }
+                asdl_seq_SET(orelse, i, val);
+            }
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_IfLoop(test, body, orelse, lineno, col_offset,
+                             end_lineno, end_col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -11829,10 +11829,10 @@ astmodule_exec(PyObject *m)
     if (PyModule_AddObjectRef(m, "AsyncFor", state->AsyncFor_type) < 0) {
         return -1;
     }
-    if (PyModule_AddObjectRef(m, "IfLoop", state->IfLoop_type) < 0) {
+    if (PyModule_AddObjectRef(m, "While", state->While_type) < 0) {
         return -1;
     }
-    if (PyModule_AddObjectRef(m, "While", state->While_type) < 0) {
+    if (PyModule_AddObjectRef(m, "IfLoop", state->IfLoop_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "If", state->If_type) < 0) {

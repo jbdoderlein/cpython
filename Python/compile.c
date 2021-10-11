@@ -173,7 +173,7 @@ It's called a frame block to distinguish it from a basic block in the
 compiler IR.
 */
 
-enum fblocktype { WHILE_LOOP, FOR_LOOP, TRY_EXCEPT, FINALLY_TRY, FINALLY_END,
+enum fblocktype { IFLOOP_LOOP, WHILE_LOOP, FOR_LOOP, TRY_EXCEPT, FINALLY_TRY, FINALLY_END,
                   WITH, ASYNC_WITH, HANDLER_CLEANUP, POP_VALUE, EXCEPTION_HANDLER,
                   ASYNC_COMPREHENSION_GENERATOR };
 
@@ -1845,6 +1845,7 @@ compiler_unwind_fblock(struct compiler *c, struct fblockinfo *info,
 {
     switch (info->fb_type) {
         case WHILE_LOOP:
+        case IFLOOP_LOOP:
         case EXCEPTION_HANDLER:
         case ASYNC_COMPREHENSION_GENERATOR:
             return 1;
@@ -1949,7 +1950,7 @@ compiler_unwind_fblock_stack(struct compiler *c, int preserve_tos, struct fblock
         return 1;
     }
     struct fblockinfo *top = &c->u->u_fblock[c->u->u_nfblocks-1];
-    if (loop != NULL && (top->fb_type == WHILE_LOOP || top->fb_type == FOR_LOOP)) {
+    if (loop != NULL && (top->fb_type == WHILE_LOOP || top->fb_type == FOR_LOOP || top->fb_type == IFLOOP_LOOP)) {
         *loop = top;
         return 1;
     }
@@ -3063,6 +3064,43 @@ compiler_while(struct compiler *c, stmt_ty s)
 }
 
 static int
+compiler_ifloop(struct compiler *c, stmt_ty s)
+{
+    basicblock *loop, *body, *end, *anchor = NULL;
+    loop = compiler_new_block(c);
+    body = compiler_new_block(c);
+    anchor = compiler_new_block(c);
+    end = compiler_new_block(c);
+    if (loop == NULL || body == NULL || anchor == NULL || end == NULL) {
+        return 0;
+    }
+    compiler_use_next_block(c, loop);
+    if (!compiler_push_fblock(c, IFLOOP_LOOP, loop, end, NULL)) {
+        return 0;
+    }
+    if (!compiler_jump_if(c, s->v.IfLoop.test, anchor, 0)) {
+        return 0;
+    }
+
+    compiler_use_next_block(c, body);
+    VISIT_SEQ(c, stmt, s->v.IfLoop.body);
+    SET_LOC(c, s);
+    if (!compiler_jump_if(c, s->v.IfLoop.test, body, 1)) {
+        return 0;
+    }
+
+    compiler_pop_fblock(c, IFLOOP_LOOP, loop);
+
+    compiler_use_next_block(c, anchor);
+    if (s->v.IfLoop.orelse) {
+        VISIT_SEQ(c, stmt, s->v.IfLoop.orelse);
+    }
+    compiler_use_next_block(c, end);
+
+    return 1;
+}
+
+static int
 compiler_return(struct compiler *c, stmt_ty s)
 {
     int preserve_tos = ((s->v.Return.value != NULL) &&
@@ -3631,7 +3669,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
     case While_kind:
         return compiler_while(c, s);
     case IfLoop_kind:
-        return compiler_while(c, s);
+        return compiler_ifloop(c, s);
     case If_kind:
         return compiler_if(c, s);
     case Match_kind:
