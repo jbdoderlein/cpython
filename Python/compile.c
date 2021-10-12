@@ -3034,18 +3034,18 @@ compiler_while(struct compiler *c, stmt_ty s)
     body = compiler_new_block(c);
     anchor = compiler_new_block(c);
     end = compiler_new_block(c);
-    if (loop == NULL || body == NULL || anchor == NULL || end == NULL) {
+    if (loop == NULL || body == NULL || anchor == NULL || end == NULL) { // Si qq n existe pas erreur
         return 0;
     }
-    compiler_use_next_block(c, loop);
-    if (!compiler_push_fblock(c, WHILE_LOOP, loop, end, NULL)) {
+    compiler_use_next_block(c, loop);// On calcule loop
+    if (!compiler_push_fblock(c, WHILE_LOOP, loop, end, NULL)) { // On creer un f block qui entre sur loop et sort sur end
         return 0;
     }
-    if (!compiler_jump_if(c, s->v.While.test, anchor, 0)) {
+    if (!compiler_jump_if(c, s->v.While.test, anchor, 0)) { // Si la condition est respecté alors on saute à anchor
         return 0;
     }
 
-    compiler_use_next_block(c, body);
+    compiler_use_next_block(c, body); // On calcule body
     VISIT_SEQ(c, stmt, s->v.While.body);
     SET_LOC(c, s);
     if (!compiler_jump_if(c, s->v.While.test, body, 1)) {
@@ -3081,20 +3081,27 @@ compiler_ifloop(struct compiler *c, stmt_ty s)
     if (!compiler_jump_if(c, s->v.IfLoop.test, anchor, 0)) {
         return 0;
     }
-
     compiler_use_next_block(c, body);
     VISIT_SEQ(c, stmt, s->v.IfLoop.body);
     SET_LOC(c, s);
     if (!compiler_jump_if(c, s->v.IfLoop.test, body, 1)) {
         return 0;
     }
+    compiler_use_next_block(c, anchor);
+    if (s->v.IfLoop.orelse) {
+        compiler_use_next_block(c, anchor);
+        VISIT_SEQ(c, stmt, s->v.IfLoop.orelse);
+        SET_LOC(c, s);
+        if (!compiler_jump_if(c, s->v.IfLoop.test, body, 1)) {
+            return 0;
+        } 
+        if (!compiler_jump_if(c, s->v.IfLoop.test, anchor, 0)) {
+            return 0;
+        } 
+    }
 
     compiler_pop_fblock(c, IFLOOP_LOOP, loop);
 
-    compiler_use_next_block(c, anchor);
-    if (s->v.IfLoop.orelse) {
-        VISIT_SEQ(c, stmt, s->v.IfLoop.orelse);
-    }
     compiler_use_next_block(c, end);
 
     return 1;
