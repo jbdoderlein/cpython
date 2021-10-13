@@ -121,6 +121,7 @@ simple_stmt[stmt_ty] (memo):
     | &'yield' yield_stmt
     | &'assert' assert_stmt
     | 'break' { _PyAST_Break(EXTRA) }
+    | 'dbreak' { _PyAST_DBreak(EXTRA) }
     | 'continue' { _PyAST_Continue(EXTRA) }
     | &'global' global_stmt
     | &'nonlocal' nonlocal_stmt

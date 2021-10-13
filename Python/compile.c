@@ -3169,6 +3169,40 @@ compiler_break(struct compiler *c)
 }
 
 static int
+compiler_dbreak(struct compiler *c)
+{
+    struct fblockinfo *loop1 = NULL;
+    /* Emit instruction with line number */
+    ADDOP(c, NOP);
+    if (!compiler_unwind_fblock_stack(c, 0, &loop1)) {
+        return 0;
+    }
+    if (loop1 == NULL) {
+        return compiler_error(c, "'break' outside loop");
+    }
+    if (!compiler_unwind_fblock(c, loop1, 0)) {
+        return 0;
+    }
+    compiler_pop_fblock(c, WHILE_LOOP, loop1->fb_block);
+    struct fblockinfo *loop2 = NULL;
+    if (!compiler_unwind_fblock_stack(c, 0, &loop2)) {
+        return 0;
+    }
+    if (loop2 == NULL) {
+        ADDOP_JUMP(c, JUMP_ABSOLUTE, loop1->fb_exit);
+        NEXT_BLOCK(c);
+        return 1;
+    }
+    if (!compiler_unwind_fblock(c, loop2, 0)) {
+        return 0;
+    }
+    ADDOP_JUMP(c, JUMP_ABSOLUTE, loop2->fb_exit);
+    NEXT_BLOCK(c);
+    compiler_pop_fblock(c, WHILE_LOOP, loop2->fb_block);
+    return 1;
+}
+
+static int
 compiler_continue(struct compiler *c)
 {
     struct fblockinfo *loop = NULL;
@@ -3712,6 +3746,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         break;
     case Break_kind:
         return compiler_break(c);
+    case DBreak_kind:
+        return compiler_dbreak(c);
     case Continue_kind:
         return compiler_continue(c);
     case With_kind:

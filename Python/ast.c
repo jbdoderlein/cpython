@@ -854,6 +854,7 @@ validate_stmt(struct validator *state, stmt_ty stmt)
         break;
     case Pass_kind:
     case Break_kind:
+    case DBreak_kind:
     case Continue_kind:
         ret = 1;
         break;

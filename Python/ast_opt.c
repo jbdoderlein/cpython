@@ -996,6 +996,7 @@ astfold_stmt(stmt_ty node_, PyArena *ctx_, _PyASTOptimizeState *state)
     case Nonlocal_kind:
     case Pass_kind:
     case Break_kind:
+    case DBreak_kind:
     case Continue_kind:
         break;
     // No default case, so the compiler will emit a warning if new statement

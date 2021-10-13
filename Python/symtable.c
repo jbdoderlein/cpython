@@ -1431,6 +1431,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         break;
     case Pass_kind:
     case Break_kind:
+    case DBreak_kind:
     case Continue_kind:
         /* nothing to do here */
         break;

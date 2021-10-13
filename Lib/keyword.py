@@ -27,6 +27,7 @@ kwlist = [
     'break',
     'class',
     'continue',
+    'dbreak',
     'def',
     'del',
     'elif',

@@ -54,6 +54,7 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Compare_type);
     Py_CLEAR(state->Constant_type);
     Py_CLEAR(state->Continue_type);
+    Py_CLEAR(state->DBreak_type);
     Py_CLEAR(state->Del_singleton);
     Py_CLEAR(state->Del_type);
     Py_CLEAR(state->Delete_type);
@@ -1154,6 +1155,7 @@ init_types(struct ast_state *state)
         "     | Expr(expr value)\n"
         "     | Pass\n"
         "     | Break\n"
+        "     | DBreak\n"
         "     | Continue");
     if (!state->stmt_type) return 0;
     if (!add_attributes(state, state->stmt_type, stmt_attributes, 4)) return 0;
@@ -1301,6 +1303,9 @@ init_types(struct ast_state *state)
     state->Break_type = make_type(state, "Break", state->stmt_type, NULL, 0,
         "Break");
     if (!state->Break_type) return 0;
+    state->DBreak_type = make_type(state, "DBreak", state->stmt_type, NULL, 0,
+        "DBreak");
+    if (!state->DBreak_type) return 0;
     state->Continue_type = make_type(state, "Continue", state->stmt_type, NULL,
                                      0,
         "Continue");
@@ -2556,6 +2561,22 @@ _PyAST_Break(int lineno, int col_offset, int end_lineno, int end_col_offset,
     if (!p)
         return NULL;
     p->kind = Break_kind;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+stmt_ty
+_PyAST_DBreak(int lineno, int col_offset, int end_lineno, int end_col_offset,
+              PyArena *arena)
+{
+    stmt_ty p;
+    p = (stmt_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = DBreak_kind;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -4192,6 +4213,11 @@ ast2obj_stmt(struct ast_state *state, void* _o)
         break;
     case Break_kind:
         tp = (PyTypeObject *)state->Break_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        break;
+    case DBreak_kind:
+        tp = (PyTypeObject *)state->DBreak_type;
         result = PyType_GenericNew(tp, NULL, NULL);
         if (!result) goto failed;
         break;
@@ -7975,6 +8001,18 @@ obj2ast_stmt(struct ast_state *state, PyObject* obj, stmt_ty* out, PyArena*
 
         *out = _PyAST_Break(lineno, col_offset, end_lineno, end_col_offset,
                             arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->DBreak_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+
+        *out = _PyAST_DBreak(lineno, col_offset, end_lineno, end_col_offset,
+                             arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -11875,6 +11913,9 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Break", state->Break_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "DBreak", state->DBreak_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Continue", state->Continue_type) < 0) {
