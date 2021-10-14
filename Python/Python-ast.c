@@ -121,6 +121,7 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Module_type);
     Py_CLEAR(state->Mult_singleton);
     Py_CLEAR(state->Mult_type);
+    Py_CLEAR(state->NBreak_type);
     Py_CLEAR(state->Name_type);
     Py_CLEAR(state->NamedExpr_type);
     Py_CLEAR(state->Nonlocal_type);
@@ -419,6 +420,9 @@ static const char * const ClassDef_fields[]={
     "decorator_list",
 };
 static const char * const Return_fields[]={
+    "value",
+};
+static const char * const NBreak_fields[]={
     "value",
 };
 static const char * const Delete_fields[]={
@@ -1133,6 +1137,7 @@ init_types(struct ast_state *state)
         "     | AsyncFunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment)\n"
         "     | ClassDef(identifier name, expr* bases, keyword* keywords, stmt* body, expr* decorator_list)\n"
         "     | Return(expr? value)\n"
+        "     | NBreak(expr? value)\n"
         "     | Delete(expr* targets)\n"
         "     | Assign(expr* targets, expr value, string? type_comment)\n"
         "     | AugAssign(expr target, operator op, expr value)\n"
@@ -1194,6 +1199,12 @@ init_types(struct ast_state *state)
         "Return(expr? value)");
     if (!state->Return_type) return 0;
     if (PyObject_SetAttr(state->Return_type, state->value, Py_None) == -1)
+        return 0;
+    state->NBreak_type = make_type(state, "NBreak", state->stmt_type,
+                                   NBreak_fields, 1,
+        "NBreak(expr? value)");
+    if (!state->NBreak_type) return 0;
+    if (PyObject_SetAttr(state->NBreak_type, state->value, Py_None) == -1)
         return 0;
     state->Delete_type = make_type(state, "Delete", state->stmt_type,
                                    Delete_fields, 1,
@@ -2065,6 +2076,23 @@ _PyAST_Return(expr_ty value, int lineno, int col_offset, int end_lineno, int
         return NULL;
     p->kind = Return_kind;
     p->v.Return.value = value;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+stmt_ty
+_PyAST_NBreak(expr_ty value, int lineno, int col_offset, int end_lineno, int
+              end_col_offset, PyArena *arena)
+{
+    stmt_ty p;
+    p = (stmt_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = NBreak_kind;
+    p->v.NBreak.value = value;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -3821,6 +3849,16 @@ ast2obj_stmt(struct ast_state *state, void* _o)
         result = PyType_GenericNew(tp, NULL, NULL);
         if (!result) goto failed;
         value = ast2obj_expr(state, o->v.Return.value);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->value, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case NBreak_kind:
+        tp = (PyTypeObject *)state->NBreak_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_expr(state, o->v.NBreak.value);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->value, value) == -1)
             goto failed;
@@ -6281,6 +6319,36 @@ obj2ast_stmt(struct ast_state *state, PyObject* obj, stmt_ty* out, PyArena*
             Py_CLEAR(tmp);
         }
         *out = _PyAST_Return(value, lineno, col_offset, end_lineno,
+                             end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->NBreak_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return 1;
+    }
+    if (isinstance) {
+        expr_ty value;
+
+        if (_PyObject_LookupAttr(obj, state->value, &tmp) < 0) {
+            return 1;
+        }
+        if (tmp == NULL || tmp == Py_None) {
+            Py_CLEAR(tmp);
+            value = NULL;
+        }
+        else {
+            int res;
+            if (Py_EnterRecursiveCall(" while traversing 'NBreak' node")) {
+                goto failed;
+            }
+            res = obj2ast_expr(state, tmp, &value, arena);
+            Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_NBreak(value, lineno, col_offset, end_lineno,
                              end_col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
@@ -11847,6 +11915,9 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Return", state->Return_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "NBreak", state->NBreak_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Delete", state->Delete_type) < 0) {

@@ -1246,6 +1246,12 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
             st->st_cur->ste_returns_value = 1;
         }
         break;
+    case NBreak_kind:
+        if (s->v.NBreak.value) {
+            VISIT(st, expr, s->v.NBreak.value);
+            st->st_cur->ste_returns_value = 1;
+        }
+        break;
     case Delete_kind:
         VISIT_SEQ(st, expr, s->v.Delete.targets);
         break;

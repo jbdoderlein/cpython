@@ -107,6 +107,7 @@ struct ast_state {
     PyObject *Module_type;
     PyObject *Mult_singleton;
     PyObject *Mult_type;
+    PyObject *NBreak_type;
     PyObject *Name_type;
     PyObject *NamedExpr_type;
     PyObject *Nonlocal_type;

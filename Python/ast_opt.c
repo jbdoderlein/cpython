@@ -913,6 +913,9 @@ astfold_stmt(stmt_ty node_, PyArena *ctx_, _PyASTOptimizeState *state)
     case Return_kind:
         CALL_OPT(astfold_expr, expr_ty, node_->v.Return.value);
         break;
+    case NBreak_kind:
+        CALL_OPT(astfold_expr, expr_ty, node_->v.NBreak.value);
+        break;
     case Delete_kind:
         CALL_SEQ(astfold_expr, expr, node_->v.Delete.targets);
         break;

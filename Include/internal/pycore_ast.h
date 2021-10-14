@@ -175,14 +175,14 @@ struct _mod {
 };
 
 enum _stmt_kind {FunctionDef_kind=1, AsyncFunctionDef_kind=2, ClassDef_kind=3,
-                  Return_kind=4, Delete_kind=5, Assign_kind=6,
-                  AugAssign_kind=7, AnnAssign_kind=8, For_kind=9,
-                  AsyncFor_kind=10, While_kind=11, IfLoop_kind=12, If_kind=13,
-                  With_kind=14, AsyncWith_kind=15, Match_kind=16,
-                  Raise_kind=17, Try_kind=18, Assert_kind=19, Import_kind=20,
-                  ImportFrom_kind=21, Global_kind=22, Nonlocal_kind=23,
-                  Expr_kind=24, Pass_kind=25, Break_kind=26, DBreak_kind=27,
-                  Continue_kind=28};
+                  Return_kind=4, NBreak_kind=5, Delete_kind=6, Assign_kind=7,
+                  AugAssign_kind=8, AnnAssign_kind=9, For_kind=10,
+                  AsyncFor_kind=11, While_kind=12, IfLoop_kind=13, If_kind=14,
+                  With_kind=15, AsyncWith_kind=16, Match_kind=17,
+                  Raise_kind=18, Try_kind=19, Assert_kind=20, Import_kind=21,
+                  ImportFrom_kind=22, Global_kind=23, Nonlocal_kind=24,
+                  Expr_kind=25, Pass_kind=26, Break_kind=27, DBreak_kind=28,
+                  Continue_kind=29};
 struct _stmt {
     enum _stmt_kind kind;
     union {
@@ -215,6 +215,10 @@ struct _stmt {
         struct {
             expr_ty value;
         } Return;
+
+        struct {
+            expr_ty value;
+        } NBreak;
 
         struct {
             asdl_expr_seq *targets;
@@ -654,6 +658,8 @@ stmt_ty _PyAST_ClassDef(identifier name, asdl_expr_seq * bases,
                         col_offset, int end_lineno, int end_col_offset, PyArena
                         *arena);
 stmt_ty _PyAST_Return(expr_ty value, int lineno, int col_offset, int
+                      end_lineno, int end_col_offset, PyArena *arena);
+stmt_ty _PyAST_NBreak(expr_ty value, int lineno, int col_offset, int
                       end_lineno, int end_col_offset, PyArena *arena);
 stmt_ty _PyAST_Delete(asdl_expr_seq * targets, int lineno, int col_offset, int
                       end_lineno, int end_col_offset, PyArena *arena);

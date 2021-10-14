@@ -3203,6 +3203,53 @@ compiler_dbreak(struct compiler *c)
 }
 
 static int
+compiler_nbreak(struct compiler *c, stmt_ty s)
+{
+    if(s->v.NBreak.value != NULL){
+        if(s->v.NBreak.value->kind == Constant_kind){
+            if(PyLong_Check(s->v.NBreak.value->v.Constant.value) == 1){
+                long int max_break = PyLong_AsLong(s->v.NBreak.value->v.Constant.value);
+                struct fblockinfo *loop = NULL;
+                struct fblockinfo *bloop = NULL;
+                ADDOP(c, NOP);
+                for(int long i = 0;i<max_break;i++){
+                    bloop = loop;
+                    if (!compiler_unwind_fblock_stack(c, 0, &loop)) {
+                        return 0;
+                    }
+                    if (loop == NULL || loop==bloop) {
+                        if(i!=0){
+                            ADDOP_JUMP(c, JUMP_ABSOLUTE, loop->fb_exit);
+                            NEXT_BLOCK(c);
+                            return 1;
+                        }
+                        else{
+                            return compiler_error(c, "'break' outside at least n loop");
+                        }   
+                    }
+                    if (!compiler_unwind_fblock(c, loop, 0)) {
+                        return 0;
+                    }
+                    compiler_pop_fblock(c, WHILE_LOOP, loop->fb_block);
+                }
+                ADDOP_JUMP(c, JUMP_ABSOLUTE, loop->fb_exit);
+                NEXT_BLOCK(c);
+            }
+            else{
+                return compiler_error(c, "'nbreak' with not int");
+            }
+        }
+        else{
+            return compiler_error(c, "'nbreak' with not constant");
+        }
+    }
+    else{
+        compiler_break(c);
+    }
+    return 1;
+}
+
+static int
 compiler_continue(struct compiler *c)
 {
     struct fblockinfo *loop = NULL;
@@ -3688,6 +3735,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_class(c, s);
     case Return_kind:
         return compiler_return(c, s);
+    case NBreak_kind:
+        return compiler_nbreak(c, s);
     case Delete_kind:
         VISIT_SEQ(c, expr, s->v.Delete.targets)
         break;

@@ -698,6 +698,9 @@ validate_stmt(struct validator *state, stmt_ty stmt)
     case Return_kind:
         ret = !stmt->v.Return.value || validate_expr(state, stmt->v.Return.value, Load);
         break;
+    case NBreak_kind:
+        ret = !stmt->v.NBreak.value || validate_expr(state, stmt->v.NBreak.value, Load);
+        break;
     case Delete_kind:
         ret = validate_assignlist(state, stmt->v.Delete.targets, Del);
         break;
